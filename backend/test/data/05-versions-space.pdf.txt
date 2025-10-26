@@ -1,0 +1,7 @@
+
+
+This is a test document for the ExamPrep Tool.
+It contains some sample text about machine learning.
+Machine learning is a subset of artificial intelligence.
+Neural networks are used in deep learning applications.
+This helps test the text processing features.
