@@ -1,158 +1,157 @@
 import Upload from '../models/Upload.js';
 import fs from 'fs';
 import path from 'path';
+import { 
+  generateSummaryWithGemini, 
+  extractKeywordsWithGemini,
+  extractTopicsWithGemini,
+  analyzeTextDifficulty 
+} from '../services/geminiService.js';
 
-// Enhanced text processing function (same as before)
+// ENHANCED TEXT PROCESSING (FALLBACK) WITH STRUCTURED OUTPUT
 function enhancedTextProcessing(text) {
-  const cleanText = text
-    .replace(/\s+/g, ' ')
-    .replace(/\n+/g, '\n')
-    .trim();
-
-  const sentences = cleanText
-    .split(/[.!?]+/)
-    .map(s => s.trim())
-    .filter(s => s.length > 15);
-
-  const words = cleanText
-    .toLowerCase()
-    .split(/\s+/)
-    .map(word => word.replace(/[^a-zA-Z]/g, ''))
-    .filter(word => word.length > 2);
-
+  console.log('🧠 Using enhanced custom algorithm with structured output...');
+  
+  const cleanText = text.replace(/\s+/g, ' ').trim();
+  const sentences = cleanText.split(/(?<=[.!?])\s+(?=[A-Z])/).filter(s => s.length > 20);
+  const words = cleanText.toLowerCase().split(/\s+/).filter(w => w.length > 3);
   const wordCount = words.length;
 
-  let summary;
-  if (sentences.length >= 3) {
-    const wordFreq = {};
-    words.forEach(word => {
-      if (!isStopWord(word)) {
-        wordFreq[word] = (wordFreq[word] || 0) + 1;
-      }
-    });
-
-    const sentenceScores = sentences.map((sentence, index) => {
-      const sentenceWords = sentence.toLowerCase().split(/\s+/);
-      const score = sentenceWords.reduce((sum, word) => {
-        const cleanWord = word.replace(/[^a-zA-Z]/g, '');
-        return sum + (wordFreq[cleanWord] || 0);
-      }, 0);
-      
-      const positionBoost = Math.max(0.5, 1 - (index / sentences.length) * 0.3);
-      
-      return {
-        sentence: sentence + '.',
-        score: score * positionBoost,
-        index
-      };
-    });
-
-    const topSentences = sentenceScores
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 3)
-      .sort((a, b) => a.index - b.index);
-
-    summary = topSentences.map(s => s.sentence).join(' ');
-  } else {
-    summary = cleanText.substring(0, 300) + (cleanText.length > 300 ? '...' : '');
-  }
-
-  const stopWords = getStopWords();
+  // Word frequency
   const wordFreq = {};
-  
   words.forEach(word => {
-    if (word.length > 3 && !stopWords.has(word)) {
-      wordFreq[word] = (wordFreq[word] || 0) + 1;
-    }
+    const clean = word.replace(/[^a-z]/g, '');
+    if (clean.length > 3) wordFreq[clean] = (wordFreq[clean] || 0) + 1;
   });
 
+  // Remove stopwords
+  const stopWords = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'this', 'that', 'these', 'those', 'are', 'was', 'were', 'been', 'have', 'has', 'had']);
+  Object.keys(wordFreq).forEach(word => {
+    if (stopWords.has(word)) delete wordFreq[word];
+  });
+
+  // Score sentences
+  const scoredSentences = sentences.map((sentence, index) => {
+    const sentenceWords = sentence.toLowerCase().split(/\s+/).map(w => w.replace(/[^a-z]/g, ''));
+    const score = sentenceWords.reduce((sum, word) => sum + (wordFreq[word] || 0), 0);
+    let positionBoost = index < 2 ? 1.5 : index > sentences.length - 3 ? 1.2 : 1;
+    return { sentence, score: score * positionBoost, index };
+  });
+
+  // Select top sentences
+  const topSentences = scoredSentences
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8)
+    .sort((a, b) => a.index - b.index);
+
+  // Extract keywords
   const keywords = Object.entries(wordFreq)
     .sort(([,a], [,b]) => b - a)
     .slice(0, 15)
     .map(([word, freq]) => ({
       word: word.charAt(0).toUpperCase() + word.slice(1),
-      score: freq / wordCount
+      score: freq / wordCount,
+      frequency: freq
     }));
 
-  const topics = extractTopics(keywords, cleanText);
-  const avgWordsPerSentence = wordCount / Math.max(sentences.length, 1);
-  const uniqueWordRatio = Object.keys(wordFreq).length / wordCount;
-  
-  let difficulty;
-  if (wordCount > 2000 && avgWordsPerSentence > 20 && uniqueWordRatio > 0.4) {
-    difficulty = 'hard';
-  } else if (wordCount > 800 && avgWordsPerSentence > 15) {
-    difficulty = 'medium';
-  } else {
-    difficulty = 'easy';
-  }
+  // Create topics from keywords
+  const topics = keywords.slice(0, 6).map((k, i) => ({
+    name: k.word,
+    keywords: [k.word],
+    importance: 1 - (i * 0.1),
+    frequency: k.frequency,
+    context: ''
+  }));
 
-  return { 
-    summary, 
-    keywords, 
-    topics, 
-    wordCount, 
+  // BUILD STRUCTURED SUMMARY
+  const overview = topSentences.slice(0, 2).map(s => s.sentence).join(' ');
+  
+  const keyConcepts = topSentences.slice(2, 5).map(s => `• ${s.sentence}`).join('\n');
+  
+  const importantPoints = topSentences.slice(5, 8).map(s => `• ${s.sentence}`).join('\n');
+  
+  const keyTakeaways = [
+    `• Main focus: ${keywords[0]?.word || 'N/A'}, ${keywords[1]?.word || 'N/A'}, and ${keywords[2]?.word || 'N/A'}`,
+    `• Document contains ${sentences.length} key sentences across ${wordCount} words`,
+    `• Primary topics include: ${topics.slice(0, 3).map(t => t.name).join(', ')}`
+  ].join('\n');
+
+  const structuredSummary = `📚 TOPIC OVERVIEW
+${overview}
+
+🔑 KEY CONCEPTS
+${keyConcepts}
+
+💡 IMPORTANT POINTS
+${importantPoints}
+
+✅ KEY TAKEAWAYS
+${keyTakeaways}`;
+
+  // Difficulty
+  const avgWordsPerSentence = wordCount / sentences.length;
+  const difficulty = avgWordsPerSentence > 25 ? 'hard' : avgWordsPerSentence < 15 ? 'easy' : 'medium';
+
+  return {
+    summary: structuredSummary,
+    keywords,
+    topics,
+    wordCount,
     sentences: sentences.length,
     difficulty,
     avgWordsPerSentence: Math.round(avgWordsPerSentence),
-    uniqueWordRatio: Math.round(uniqueWordRatio * 100)
+    uniqueWordRatio: Math.round((Object.keys(wordFreq).length / wordCount) * 100),
+    compressionRatio: Math.round((structuredSummary.length / cleanText.length) * 100)
   };
 }
 
-function isStopWord(word) {
-  const stopWords = getStopWords();
-  return stopWords.has(word.toLowerCase());
+// GEMINI-POWERED TEXT PROCESSING
+async function geminiTextProcessing(text) {
+  try {
+    console.log('🤖 Processing with Gemini AI...');
+    
+    // Run all analyses in parallel for speed
+    const [summary, keywords, topics, difficulty] = await Promise.all([
+      generateSummaryWithGemini(text, { sentenceCount: 5 }),
+      extractKeywordsWithGemini(text),
+      extractTopicsWithGemini(text),
+      analyzeTextDifficulty(text)
+    ]);
+
+    // Calculate basic stats
+    const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    const wordCount = words.length;
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
+    const avgWordsPerSentence = Math.round(wordCount / Math.max(sentences.length, 1));
+    const uniqueWords = new Set(words);
+    const uniqueWordRatio = Math.round((uniqueWords.size / wordCount) * 100);
+    const compressionRatio = Math.round((summary.length / text.length) * 100);
+
+    console.log('✅ Gemini processing complete');
+
+    return {
+      summary,
+      keywords,
+      topics,
+      wordCount,
+      sentences: sentences.length,
+      difficulty,
+      avgWordsPerSentence,
+      uniqueWordRatio,
+      compressionRatio
+    };
+    
+  } catch (error) {
+    console.error('❌ Gemini processing failed, falling back to custom algorithm:', error.message);
+    return enhancedTextProcessing(text);
+  }
 }
 
-function getStopWords() {
-  return new Set([
-    'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
-    'is', 'are', 'was', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did',
-    'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these', 'those',
-    'a', 'an', 'as', 'if', 'it', 'its', 'then', 'than', 'only', 'also', 'just', 'very',
-    'so', 'about', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
-    'up', 'down', 'out', 'off', 'over', 'under', 'again', 'further', 'once',
-    'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each',
-    'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'own', 'same'
-  ]);
-}
-
-function extractTopics(keywords, text) {
-  const topics = [];
-  const processedKeywords = new Set();
-
-  keywords.forEach(keyword => {
-    if (processedKeywords.has(keyword.word)) return;
-
-    const relatedKeywords = keywords.filter(k => 
-      !processedKeywords.has(k.word) && 
-      (k.word.toLowerCase().includes(keyword.word.toLowerCase().substring(0, 4)) || 
-       keyword.word.toLowerCase().includes(k.word.toLowerCase().substring(0, 4)))
-    );
-
-    if (relatedKeywords.length > 0) {
-      const topic = {
-        name: keyword.word,
-        keywords: relatedKeywords.map(k => k.word),
-        importance: relatedKeywords.reduce((sum, k) => sum + k.score, 0) / relatedKeywords.length,
-        frequency: relatedKeywords.length
-      };
-      
-      topics.push(topic);
-      relatedKeywords.forEach(k => processedKeywords.add(k.word));
-    }
-  });
-
-  return topics.slice(0, 8).sort((a, b) => b.importance - a.importance);
-}
-
+// UPLOAD FILE FUNCTION
 export const uploadFile = async (req, res) => {
   try {
     console.log('📤 Upload request received');
-    console.log('📁 File:', req.file ? req.file.originalname : 'No file'); 
-    console.log('📊 File size:', req.file ? (req.file.size / 1024 / 1024).toFixed(2) + 'MB' : 'N/A');
-    console.log('🎯 File type:', req.file ? req.file.mimetype : 'Unknown');
-
+    
     if (!req.file) {
       return res.status(400).json({ 
         success: false,
@@ -168,42 +167,34 @@ export const uploadFile = async (req, res) => {
     try {
       if (req.file.mimetype === 'application/pdf') {
         console.log('📄 Processing PDF file...');
-        
-        // Dynamic import to avoid initialization issues
         const pdfParse = (await import('pdf-parse')).default;
-        
         const dataBuffer = fs.readFileSync(req.file.path);
         const pdfData = await pdfParse(dataBuffer);
         extractedText = pdfData.text;
         pageCount = pdfData.numpages || 1;
-        console.log('✅ PDF processed:', pdfData.numpages, 'pages,', extractedText.length, 'characters');
+        console.log('✅ PDF processed:', pdfData.numpages, 'pages');
 
       } else if (req.file.mimetype === 'text/plain') {
         console.log('📄 Processing TXT file...');
         extractedText = fs.readFileSync(req.file.path, 'utf8');
-        console.log('✅ TXT processed:', extractedText.length, 'characters');
-
+        console.log('✅ TXT processed');
       } else {
-        // Clean up unsupported file
         if (fs.existsSync(req.file.path)) {
           fs.unlinkSync(req.file.path);
         }
         return res.status(400).json({ 
           success: false,
-          message: 'Currently supporting PDF and TXT files. More formats coming soon!' 
+          message: 'Currently supporting PDF and TXT files only' 
         });
       }
     } catch (fileError) {
-      console.error('❌ File processing error:', fileError.message);
-      
-      // Clean up file
+      console.error('❌ File processing error:', fileError);
       if (fs.existsSync(req.file.path)) {
         fs.unlinkSync(req.file.path);
       }
-      
       return res.status(400).json({ 
         success: false,
-        message: `Failed to process file: ${fileError.message}. Please ensure the file is not corrupted.` 
+        message: `Failed to process file: ${fileError.message}` 
       });
     }
 
@@ -213,23 +204,60 @@ export const uploadFile = async (req, res) => {
       }
       return res.status(400).json({ 
         success: false,
-        message: 'File appears to be empty or text could not be extracted' 
+        message: 'File appears to be empty' 
       });
     }
 
-    // Process text with enhanced algorithms
-    console.log('🧠 Processing text with enhanced NLP...');
-    const processed = enhancedTextProcessing(extractedText);
+    // Choose processing method
+    const useGemini = process.env.GEMINI_API_KEY && process.env.SUMMARY_MODE === 'gemini';
+    
+    let processed;
+    try {
+      if (useGemini) {
+        console.log('🤖 Using Gemini AI for processing...');
+        processed = await geminiTextProcessing(extractedText);
+      } else {
+        console.log('🧠 Using custom enhanced algorithm...');
+        processed = enhancedTextProcessing(extractedText);
+      }
+    } catch (processingError) {
+      console.error('❌ Processing error:', processingError.message);
+      console.log('⚠️ Using fallback processing...');
+      processed = enhancedTextProcessing(extractedText);
+    }
+
+    // Final validation
+    if (!processed || typeof processed.wordCount === 'undefined') {
+      console.error('❌ Invalid processing result, creating safe fallback');
+      const words = extractedText.split(/\s+/).filter(w => w.length > 0);
+      processed = {
+        summary: extractedText.substring(0, 500).trim() + (extractedText.length > 500 ? '...' : ''),
+        keywords: [],
+        topics: [],
+        wordCount: words.length,
+        sentences: extractedText.split(/[.!?]+/).filter(s => s.trim().length > 0).length,
+        difficulty: 'medium',
+        avgWordsPerSentence: 15,
+        uniqueWordRatio: 50,
+        compressionRatio: 10
+      };
+    }
+
+    // Clean summary - remove any encoding issues
+    const cleanedSummary = processed.summary
+      .replace(/□/g, '•')
+      .replace(/\u25a1/g, '•')
+      .replace(/\*/g, '•');
+    
     const readingTime = Math.ceil(processed.wordCount / 200);
 
-    console.log('✅ Text processed successfully:', {
+    console.log('✅ Processing complete:', {
+      method: useGemini ? 'Gemini AI' : 'Custom Algorithm',
       wordCount: processed.wordCount,
-      sentences: processed.sentences,
-      keywords: processed.keywords.length,
-      topics: processed.topics.length,
-      difficulty: processed.difficulty,
-      avgWordsPerSentence: processed.avgWordsPerSentence,
-      uniqueWordRatio: processed.uniqueWordRatio + '%'
+      summaryLength: cleanedSummary.length,
+      compressionRatio: processed.compressionRatio + '%',
+      keywords: processed.keywords?.length || 0,
+      topics: processed.topics?.length || 0
     });
 
     // Save to database
@@ -241,9 +269,9 @@ export const uploadFile = async (req, res) => {
       mimeType: req.file.mimetype,
       size: req.file.size,
       extractedText,
-      summary: processed.summary,
-      keywords: processed.keywords,
-      topics: processed.topics,
+      summary: cleanedSummary,
+      keywords: processed.keywords || [],
+      topics: processed.topics || [],
       metadata: {
         wordCount: processed.wordCount,
         readingTime,
@@ -251,20 +279,24 @@ export const uploadFile = async (req, res) => {
         difficulty: processed.difficulty,
         avgWordsPerSentence: processed.avgWordsPerSentence,
         uniqueWordRatio: processed.uniqueWordRatio,
-        sentences: processed.sentences
+        sentences: processed.sentences,
+        compressionRatio: processed.compressionRatio,
+        aiProcessed: useGemini
       },
       processed: true
     });
 
-    console.log('💾 Saving to database...');
     await upload.save();
-    console.log('🎉 Upload saved successfully! ID:', upload._id);
+    console.log('🎉 Upload saved successfully!');
 
     res.status(201).json({
       success: true,
-      message: 'File uploaded and processed successfully',
+      message: useGemini 
+        ? 'File processed with Gemini AI' 
+        : 'File processed with enhanced algorithm',
       data: {
         id: upload._id,
+        _id: upload._id,
         originalName: upload.originalName,
         fileType: upload.fileType,
         size: upload.size,
@@ -278,26 +310,25 @@ export const uploadFile = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Upload error:', error);
-    
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
-    
     res.status(500).json({ 
       success: false, 
-      message: 'File upload failed: ' + error.message,
-      error: error.message 
+      message: 'File upload failed: ' + error.message
     });
   }
 };
 
-// Keep other functions the same
+// GET USER UPLOADS
 export const getUserUploads = async (req, res) => {
   try {
     const uploads = await Upload.find({ user: req.user._id })
       .sort({ createdAt: -1 })
       .select('-extractedText')
       .limit(50);
+
+    console.log('📊 Found uploads:', uploads.length);
 
     res.json({
       success: true,
@@ -314,6 +345,7 @@ export const getUserUploads = async (req, res) => {
   }
 };
 
+// GET UPLOAD BY ID
 export const getUploadById = async (req, res) => {
   try {
     const upload = await Upload.findOne({ 
@@ -341,6 +373,7 @@ export const getUploadById = async (req, res) => {
   }
 };
 
+// DELETE UPLOAD
 export const deleteUpload = async (req, res) => {
   try {
     const upload = await Upload.findOne({ 

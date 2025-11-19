@@ -1,41 +1,42 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast'
-import { AuthProvider } from './context/AuthContext'
-import ProtectedRoute from './components/ProtectedRoute'
-import Navbar from './components/Navbar'
-import Home from './pages/Home'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import Dashboard from './pages/Dashboard'
-import Upload from './pages/Upload'
-import Summary from './pages/Summary'
-import { useState, useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
+import { AuthProvider } from "./context/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Navbar from "./components/Navbar";
+import Home from "./pages/Home";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
+import Upload from "./pages/Upload";
+import Summary from "./pages/Summary";
+import { useState, useEffect } from "react";
+import QuizTake from "./pages/QuizTake";
 
 export default function App() {
-  const [darkMode, setDarkMode] = useState(false)
+  const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme')
+    const savedTheme = localStorage.getItem("theme");
     if (savedTheme) {
-      setDarkMode(savedTheme === 'dark')
+      setDarkMode(savedTheme === "dark");
     } else {
-      setDarkMode(window.matchMedia('(prefers-color-scheme: dark)').matches)
+      setDarkMode(window.matchMedia("(prefers-color-scheme: dark)").matches);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
     if (darkMode) {
-      document.documentElement.classList.add('dark')
-      localStorage.setItem('theme', 'dark')
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
     } else {
-      document.documentElement.classList.remove('dark')
-      localStorage.setItem('theme', 'light')
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
     }
-  }, [darkMode])
+  }, [darkMode]);
 
   const toggleDarkMode = () => {
-    setDarkMode(!darkMode)
-  }
+    setDarkMode(!darkMode);
+  };
 
   return (
     <AuthProvider>
@@ -46,44 +47,52 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route 
-              path="/dashboard" 
+            <Route
+              path="/dashboard"
               element={
                 <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/upload" 
+            <Route
+              path="/upload"
               element={
                 <ProtectedRoute>
                   <Upload />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/summary/:id" 
+            <Route
+              path="/summary/:id"
               element={
                 <ProtectedRoute>
                   <Summary />
                 </ProtectedRoute>
-              } 
+              }
+            />
+            <Route
+              path="/quiz/:id"
+              element={
+                <ProtectedRoute>
+                  <QuizTake />
+                </ProtectedRoute>
+              }
             />
           </Routes>
-          <Toaster 
+          <Toaster
             position="top-right"
             toastOptions={{
               duration: 4000,
               style: {
-                background: darkMode ? '#374151' : '#ffffff',
-                color: darkMode ? '#f3f4f6' : '#111827',
-                border: darkMode ? '1px solid #4b5563' : '1px solid #e5e7eb'
-              }
+                background: darkMode ? "#374151" : "#ffffff",
+                color: darkMode ? "#f3f4f6" : "#111827",
+                border: darkMode ? "1px solid #4b5563" : "1px solid #e5e7eb",
+              },
             }}
           />
         </div>
       </Router>
     </AuthProvider>
-  )
+  );
 }

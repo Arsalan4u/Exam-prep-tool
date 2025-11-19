@@ -5,10 +5,13 @@ import ApiService from "../services/api";
 import toast from "react-hot-toast";
 import { FileText, Clock, Eye, Trash2, Brain, BookOpen } from "lucide-react";
 import Button from "../components/ui/Button";
+import QuizGenerationModal from '../components/QuizGenerationModal';
 
 export default function Upload() {
   const [uploads, setUploads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showQuizModal, setShowQuizModal] = useState(false);
+  const [selectedForQuiz, setSelectedForQuiz] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -82,6 +85,27 @@ export default function Upload() {
     navigate(`/summary/${idString}`);
   };
 
+  const handleGenerateQuiz = async (settings) => {
+    try {
+      console.log('🎯 Generating quiz with settings:', settings);
+      console.log('📋 Selected documents:', selectedForQuiz);
+      
+      const response = await ApiService.generateQuiz(selectedForQuiz, settings);
+      
+      if (response.success) {
+        console.log('✅ Quiz generated:', response.data);
+        toast.success('Quiz generated successfully!');
+        navigate(`/quiz/${response.data.quizId}`);
+      } else {
+        console.error('❌ Quiz generation failed:', response.message);
+        toast.error(response.message || 'Failed to generate quiz');
+      }
+    } catch (error) {
+      console.error('❌ Quiz generation error:', error);
+      toast.error('Failed to generate quiz');
+    }
+  };
+
   const generateQuiz = (ids) => {
     console.log('🧠 Generate Quiz clicked for IDs:', ids);
     
@@ -95,14 +119,18 @@ export default function Upload() {
       return;
     }
     
-    const queryParams = new URLSearchParams({ files: validIds.join(",") });
-    navigate(`/quiz/generate?${queryParams}`);
+    console.log('✅ Valid IDs for quiz:', validIds);
+    setSelectedForQuiz(validIds);
+    setShowQuizModal(true);
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading your documents...</p>
+        </div>
       </div>
     );
   }
@@ -147,30 +175,37 @@ export default function Upload() {
       {/* Empty State */}
       {uploads.length === 0 && (
         <div className="max-w-4xl mx-auto px-6 mt-12">
-          <div className="text-center py-12">
-            <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-12 text-center">
+            <FileText className="h-20 w-20 text-gray-400 mx-auto mb-6" />
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
               No documents uploaded yet
             </h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              Upload your first document to get started with AI-powered summaries
+            <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+              Upload your first document to get started with AI-powered summaries, quizzes, and more!
             </p>
+            <div className="flex gap-2 justify-center text-sm text-gray-500 dark:text-gray-400">
+              <span>✨ AI Summaries</span>
+              <span>•</span>
+              <span>🧠 Auto Quizzes</span>
+              <span>•</span>
+              <span>📊 Analytics</span>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Quiz Generation Modal */}
+      <QuizGenerationModal
+        isOpen={showQuizModal}
+        onClose={() => setShowQuizModal(false)}
+        onGenerate={handleGenerateQuiz}
+        selectedDocs={selectedForQuiz}
+      />
     </div>
   );
 }
 
 function UploadCard({ upload, onDelete, onViewSummary, onGenerateQuiz }) {
-  // Debug logging for each card
-  React.useEffect(() => {
-    console.log('📋 UploadCard rendered for:', upload.originalName);
-    console.log('🆔 Upload ID (_id):', upload._id);
-    console.log('🆔 Upload ID (id):', upload.id);
-    console.log('🔑 All upload keys:', Object.keys(upload));
-  }, [upload]);
-
   const getFileTypeColor = (type) => {
     const colors = {
       notes: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400",
@@ -190,24 +225,35 @@ function UploadCard({ upload, onDelete, onViewSummary, onGenerateQuiz }) {
     return colors[difficulty] || colors.medium;
   };
 
+  const getDifficultyBadge = (difficulty) => {
+    const badges = {
+      easy: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+      medium: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+      hard: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+    };
+    return badges[difficulty] || badges.medium;
+  };
+
   // Get the correct ID (try _id first, then id, then fallback)
   const documentId = upload._id || upload.id || upload.data?.id;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-xl transition-all duration-200">
       <div className="flex items-start justify-between">
         <div className="flex items-start space-x-4 flex-1">
-          <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
-            <FileText className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+          {/* File Icon */}
+          <div className="p-3 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl">
+            <FileText className="h-7 w-7 text-blue-600 dark:text-blue-400" />
           </div>
 
           <div className="flex-1 min-w-0">
+            {/* Header */}
             <div className="flex items-center space-x-2 mb-2">
               <h4 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
                 {upload.originalName || upload.filename || 'Unknown File'}
               </h4>
               <span
-                className={`px-2 py-1 text-xs font-medium rounded-full ${getFileTypeColor(
+                className={`px-3 py-1 text-xs font-medium rounded-full ${getFileTypeColor(
                   upload.fileType
                 )}`}
               >
@@ -215,29 +261,26 @@ function UploadCard({ upload, onDelete, onViewSummary, onGenerateQuiz }) {
               </span>
             </div>
 
-            <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400 mb-3">
+            {/* Metadata */}
+            <div className="flex items-center flex-wrap gap-x-4 gap-y-2 text-sm text-gray-500 dark:text-gray-400 mb-3">
               <span className="flex items-center">
                 <Clock className="h-4 w-4 mr-1" />
                 {upload.metadata?.readingTime || 0} min read
               </span>
-              <span>{upload.metadata?.wordCount || 0} words</span>
-              <span className={getDifficultyColor(upload.metadata?.difficulty)}>
-                {upload.metadata?.difficulty || "Medium"} difficulty
+              <span>{upload.metadata?.wordCount?.toLocaleString() || 0} words</span>
+              <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${getDifficultyBadge(upload.metadata?.difficulty)}`}>
+                {upload.metadata?.difficulty || "Medium"}
               </span>
             </div>
 
-            {/* Show Summary Preview */}
+            {/* Summary Preview */}
             {upload.summary && (
-              <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-2 mb-4">
+              <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-2 mb-4 leading-relaxed">
                 {upload.summary.substring(0, 150)}...
               </p>
             )}
 
-            {/* Debug ID Display (remove in production) */}
-            <div className="text-xs text-gray-400 mb-2 font-mono">
-              ID: {documentId} {!documentId && '(❌ NO ID FOUND)'}
-            </div>
-
+            {/* Action Buttons */}
             <div className="flex items-center space-x-2">
               <Button
                 size="sm"
@@ -270,6 +313,7 @@ function UploadCard({ upload, onDelete, onViewSummary, onGenerateQuiz }) {
           </div>
         </div>
 
+        {/* Delete Button */}
         <div className="flex items-center space-x-2">
           <button
             onClick={() => {
@@ -278,8 +322,9 @@ function UploadCard({ upload, onDelete, onViewSummary, onGenerateQuiz }) {
             }}
             className="p-2 text-gray-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
             disabled={!documentId}
+            title="Delete document"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-5 w-5" />
           </button>
         </div>
       </div>
@@ -287,7 +332,7 @@ function UploadCard({ upload, onDelete, onViewSummary, onGenerateQuiz }) {
       {/* Topics Preview */}
       {upload.topics && upload.topics.length > 0 && (
         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center space-x-2 mb-2">
+          <div className="flex items-center space-x-2 mb-3">
             <BookOpen className="h-4 w-4 text-gray-500" />
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
               Key Topics:
@@ -297,19 +342,30 @@ function UploadCard({ upload, onDelete, onViewSummary, onGenerateQuiz }) {
             {upload.topics.slice(0, 5).map((topic, index) => (
               <span
                 key={index}
-                className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs rounded-md"
+                className="px-3 py-1 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 text-blue-700 dark:text-blue-300 text-xs rounded-full font-medium border border-blue-100 dark:border-blue-800"
               >
                 {topic.name}
               </span>
             ))}
             {upload.topics.length > 5 && (
-              <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs rounded-md">
+              <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs rounded-full font-medium">
                 +{upload.topics.length - 5} more
               </span>
             )}
           </div>
         </div>
       )}
+
+      {/* Upload Date */}
+      <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Uploaded on {new Date(upload.createdAt).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          })}
+        </p>
+      </div>
     </div>
   );
 }

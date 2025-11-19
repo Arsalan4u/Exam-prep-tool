@@ -28,6 +28,12 @@ const PORT = process.env.PORT || 5000;
 connectDB();
 
 // Security and middleware
+
+app.use((req, res, next) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  next();
+});
+
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));

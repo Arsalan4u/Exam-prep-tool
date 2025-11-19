@@ -1,88 +1,59 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 class ApiService {
-  constructor() {
-    this.baseURL = API_BASE_URL
-  }
+  // ... existing methods (login, register, etc.) ...
 
-  async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`
-    const token = localStorage.getItem('token')
-
-    const config = {
+  // Quiz Generation
+  async generateQuiz(fileIds, options = {}) {
+    const response = await fetch(`${API_URL}/quiz/generate`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
       },
-      ...options,
-    }
+      body: JSON.stringify({
+        fileIds: Array.isArray(fileIds) ? fileIds : [fileIds],
+        questionCount: options.questionCount || 10,
+        difficulty: options.difficulty || 'all'
+      })
+    });
+    return response.json();
+  }
 
-    // Remove Content-Type for FormData
-    if (options.body instanceof FormData) {
-      delete config.headers['Content-Type']
-    }
-
-    try {
-      const response = await fetch(url, config)
-      
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || `HTTP error! status: ${response.status}`)
+  // Get specific quiz
+  async getQuiz(quizId) {
+    const response = await fetch(`${API_URL}/quiz/${quizId}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
       }
-
-      return await response.json()
-    } catch (error) {
-      console.error('API Request Error:', error)
-      throw error
-    }
+    });
+    return response.json();
   }
 
-  // Authentication
-  async login(email, password) {
-    return this.request('/auth/login', {
+  // Submit quiz attempt
+  async submitQuiz(quizId, answers, timeSpent) {
+    const response = await fetch(`${API_URL}/quiz/${quizId}/submit`, {
       method: 'POST',
-      body: JSON.stringify({ email, password })
-    })
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({ answers, timeSpent })
+    });
+    return response.json();
   }
 
-  async register(name, email, password) {
-    return this.request('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ name, email, password })
-    })
+  // Get all user quizzes
+  async getUserQuizzes() {
+    const response = await fetch(`${API_URL}/quiz/user/all`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    return response.json();
   }
 
-  async getProfile() {
-    return this.request('/auth/me')
-  }
-
-  // Upload
-  async uploadFile(formData) {
-    return this.request('/upload', {
-      method: 'POST',
-      body: formData
-    })
-  }
-
-  async getUserUploads() {
-    return this.request('/upload')
-  }
-
-  async getUploadById(id) {
-    return this.request(`/upload/${id}`)
-  }
-
-  async deleteUpload(id) {
-    return this.request(`/upload/${id}`, {
-      method: 'DELETE'
-    })
-  }
-
-  // Progress
-  async getProgress() {
-    return this.request('/progress')
-  }
+  // ... rest of existing methods ...
 }
 
-export default new ApiService()
+export default new ApiService();
