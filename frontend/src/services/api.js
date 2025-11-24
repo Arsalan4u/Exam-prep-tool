@@ -65,8 +65,9 @@ class ApiService {
     })
   }
 
+  // ✅ CHANGED THIS LINE - Added /my-uploads
   async getUserUploads() {
-    return this.request('/upload')
+    return this.request('/upload/my-uploads')
   }
 
   async getUploadById(id) {
@@ -76,6 +77,32 @@ class ApiService {
   async deleteUpload(id) {
     return this.request(`/upload/${id}`, {
       method: 'DELETE'
+    })
+  }
+
+  // NEW: Get public uploads for library
+  async getPublicUploads(subject, semester, search) {
+    let query = '/upload/public/all?'
+    if (subject) query += `subject=${subject}&`
+    if (semester) query += `semester=${semester}&`
+    if (search) query += `search=${search}&`
+    return this.request(query)
+  }
+
+  // NEW: Search uploads
+  async searchUploads(query, subject, semester) {
+    let endpoint = '/upload/public/search?'
+    if (query) endpoint += `query=${query}&`
+    if (subject) endpoint += `subject=${subject}&`
+    if (semester) endpoint += `semester=${semester}&`
+    return this.request(endpoint)
+  }
+
+  // NEW: Update visibility
+  async updateVisibility(id, visibility) {
+    return this.request(`/upload/${id}/visibility`, {
+      method: 'PATCH',
+      body: JSON.stringify({ visibility })
     })
   }
 

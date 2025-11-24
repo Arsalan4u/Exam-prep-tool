@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, FileText, Brain, Hash, Lightbulb, Copy, Download, BookOpen } from 'lucide-react'
+import { ArrowLeft, FileText, Brain, Hash, Lightbulb, Copy, Download, BookOpen, Zap } from 'lucide-react'
 import ApiService from '../services/api'
 import toast from 'react-hot-toast'
 import Button from '../components/ui/Button'
+import QuizGenerationModal from '../components/QuizGenerationModal'
 
 export default function Summary() {
   const { id } = useParams()
@@ -11,6 +12,8 @@ export default function Summary() {
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [showQuizModal, setShowQuizModal] = useState(false)
+  const [quizLoading, setQuizLoading] = useState(false)
 
   useEffect(() => {
     if (id && id !== 'undefined') {
@@ -60,27 +63,20 @@ export default function Summary() {
     }
   }
 
-  // IMPROVED FORMATTING - Fixes square character issue
+  // ---- Formatting logic stays the same ----
+
   const formatSummary = (text) => {
     if (!text) return { formatted: '', isStructured: false };
-    
-    // Clean up any encoding issues - replace squares with proper bullets
     let cleanedText = text
       .replace(/□/g, '•')
       .replace(/\u25a1/g, '•')
       .replace(/\u2022/g, '•')
       .replace(/\*/g, '•');
-    
-    // Check if already structured (has emoji headers)
     const isStructured = cleanedText.includes('📚') || cleanedText.includes('🔑') || cleanedText.includes('💡');
-    
     if (isStructured) {
-      // Format structured summary
       const lines = cleanedText.split('\n');
       const formatted = lines.map(line => {
         const trimmed = line.trim();
-        
-        // Headers with emojis
         if (trimmed.includes('📚 TOPIC OVERVIEW') || trimmed.includes('📚 Topic Overview')) {
           return '<h3 class="text-xl font-bold text-blue-600 dark:text-blue-400 mt-6 mb-4 flex items-center gap-2"><span>📚</span><span>Topic Overview</span></h3>';
         }
@@ -96,40 +92,29 @@ export default function Summary() {
         if (trimmed.includes('✅ KEY TAKEAWAYS') || trimmed.includes('✅ Key Takeaways')) {
           return '<h3 class="text-xl font-bold text-red-600 dark:text-red-400 mt-6 mb-4 flex items-center gap-2"><span>✅</span><span>Key Takeaways</span></h3>';
         }
-        
-        // Bullet points - properly format with actual disc bullets
         if (trimmed.startsWith('•')) {
           const content = trimmed.substring(1).trim();
           return `<li class="text-gray-700 dark:text-gray-300 leading-relaxed mb-2" style="list-style-type: disc; display: list-item;">${content}</li>`;
         }
-        
-        // Regular paragraphs
         if (trimmed && !trimmed.includes('<h3') && !trimmed.includes('<li')) {
           return `<p class="text-gray-700 dark:text-gray-300 leading-relaxed mb-4">${trimmed}</p>`;
         }
-        
         return '';
       }).filter(line => line).join('\n');
-      
-      // Wrap consecutive list items in ul tags
       const withLists = formatted.replace(/(<li.*?<\/li>\n?)+/g, match => {
         return `<ul class="space-y-2 my-4 ml-8 list-disc">${match}</ul>`;
       });
-      
       return {
         formatted: withLists,
         isStructured: true
       };
     } else {
-      // Auto-format unstructured text into readable paragraphs
       const sentences = cleanedText.split(/(?<=[.!?])\s+/);
       const paragraphs = [];
-      
       for (let i = 0; i < sentences.length; i += 3) {
         const chunk = sentences.slice(i, i + 3).join(' ');
         paragraphs.push(`<p class="text-gray-700 dark:text-gray-300 leading-loose mb-6 text-justify">${chunk}</p>`);
       }
-      
       return {
         formatted: paragraphs.join('\n'),
         isStructured: false
@@ -156,8 +141,8 @@ export default function Summary() {
             <FileText className="h-16 w-16 mx-auto mb-4" />
             <p className="text-lg font-medium">{error}</p>
           </div>
-          <Button onClick={() => navigate('/upload')} variant="primary">
-            Go Back to Uploads
+          <Button onClick={() => navigate('/documents')} variant="primary">
+            Go Back to Documents
           </Button>
         </div>
       </div>
@@ -172,11 +157,11 @@ export default function Summary() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <button
-            onClick={() => navigate('/upload')}
+            onClick={() => navigate('/documents')}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
           >
             <ArrowLeft className="h-5 w-5" />
-            <span className="font-medium">Back to Uploads</span>
+            <span className="font-medium">Back to Documents</span>
           </button>
           
           <div className="flex items-center gap-3">
@@ -238,6 +223,61 @@ export default function Summary() {
           </div>
         </div>
 
+        {/* Generate Quiz (with Modal) */}
+        <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl shadow-lg p-6 mb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-white/20 rounded-xl">
+                <Zap className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white mb-1">
+                  Test Your Knowledge
+                </h3>
+                <p className="text-white/90 text-sm">
+                  Generate an AI-powered quiz from this document
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={() => setShowQuizModal(true)}
+              className="bg-white text-purple-600 hover:bg-gray-100 font-bold px-6 py-3 shadow-lg"
+            >
+              <Zap className="h-5 w-5 mr-2" />
+              Generate Quiz
+            </Button>
+          </div>
+        </div>
+
+        {/* QUIZ MODAL */}
+        <QuizGenerationModal
+  isOpen={showQuizModal}
+  onClose={() => setShowQuizModal(false)}
+  onGenerate={(settings) => {
+    setQuizLoading(true);
+    ApiService.generateQuiz([id], {
+      questionCount: settings.questionCount,
+      difficulty: settings.difficulty,
+      types: ['mcq', 'true_false']
+    })
+      .then((response) => {
+        setQuizLoading(false);
+        setShowQuizModal(false);
+        if (response.success) {
+          toast.success('Quiz generated successfully!');
+          navigate(`/quiz/${response.data._id}`);
+        } else {
+          toast.error('Failed to generate quiz');
+        }
+      })
+      .catch((error) => {
+        setQuizLoading(false);
+        toast.error('Quiz generation failed');
+      });
+  }}
+  selectedDocs={[{ name: summary?.originalName || 'Document' }]}
+/>
+
         {/* Summary */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 mb-8">
           <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
@@ -268,7 +308,6 @@ export default function Summary() {
 
         {/* Topics & Keywords */}
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Topics */}
           {summary?.topics && summary.topics.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center gap-3 mb-6">
@@ -279,7 +318,6 @@ export default function Summary() {
                   Key Topics
                 </h3>
               </div>
-              
               <div className="space-y-4">
                 {summary.topics.slice(0, 8).map((topic, index) => (
                   <div key={index} className="group">
@@ -303,7 +341,6 @@ export default function Summary() {
             </div>
           )}
 
-          {/* Keywords */}
           {summary?.keywords && summary.keywords.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center gap-3 mb-6">
@@ -314,7 +351,6 @@ export default function Summary() {
                   Important Keywords
                 </h3>
               </div>
-              
               <div className="flex flex-wrap gap-2">
                 {summary.keywords.slice(0, 15).map((keyword, index) => (
                   <span
@@ -328,8 +364,6 @@ export default function Summary() {
             </div>
           )}
         </div>
-
-        {/* Add CSS for proper bullet rendering */}
         <style jsx>{`
           .summary-content ul {
             list-style-type: disc !important;

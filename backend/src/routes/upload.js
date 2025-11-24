@@ -7,7 +7,10 @@ import {
   uploadFile, 
   getUserUploads, 
   getUploadById, 
-  deleteUpload 
+  deleteUpload,
+  getPublicUploads,
+  searchUploads,
+  updateUploadVisibility 
 } from '../controllers/uploadController.js';
 
 const router = express.Router();
@@ -28,29 +31,41 @@ const storage = multer.diskStorage({
   }
 });
 
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-  
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Invalid file type. Only PDF, TXT, DOC, and DOCX files are allowed.'), false);
-  }
-};
-
-const uploadMiddleware = multer({
+const upload = multer({ 
   storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB
-  },
-  fileFilter
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /pdf|txt/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only PDF and TXT files are allowed'));
+    }
+  }
 });
 
-router.use(protect); // All routes require authentication
+// Upload file with metadata
+router.post('/', protect, upload.single('file'), uploadFile);
 
-router.post('/', uploadMiddleware.single('file'), uploadFile);
-router.get('/', getUserUploads);
-router.get('/:id', getUploadById);
-router.delete('/:id', deleteUpload);
+// Get user's own uploads
+router.get('/my-uploads', protect, getUserUploads);
+
+// Get all public uploads (library)
+router.get('/public/all', protect, getPublicUploads);
+
+// Search public uploads
+router.get('/public/search', protect, searchUploads);
+
+// Update upload visibility
+router.patch('/:id/visibility', protect, updateUploadVisibility);
+
+// Get specific upload by ID
+router.get('/:id', protect, getUploadById);
+
+// Delete upload
+router.delete('/:id', protect, deleteUpload);
 
 export default router;

@@ -203,11 +203,13 @@ router.post('/generate', async (req, res) => {
     await quiz.save();
     console.log('✅ Quiz saved:', quiz._id);
 
+    // ✅ FIXED: Return consistent structure with _id
     res.json({
       success: true,
       message: 'Quiz generated successfully',
       data: {
-        quizId: quiz._id,
+        _id: quiz._id,           // ✅ ADDED THIS
+        quizId: quiz._id,        // Keep for backward compatibility
         title: quiz.title,
         questions: quiz.questions,
         settings: quiz.settings,
@@ -228,6 +230,14 @@ router.post('/generate', async (req, res) => {
 // GET /api/quiz/:id - Get quiz by ID
 router.get('/:id', async (req, res) => {
   try {
+    // ✅ FIXED: Validate ID before querying
+    if (!req.params.id || req.params.id === 'undefined' || req.params.id === 'null') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid quiz ID'
+      });
+    }
+
     const quiz = await Quiz.findOne({
       _id: req.params.id,
       user: req.user._id
@@ -257,7 +267,16 @@ router.get('/:id', async (req, res) => {
 // POST /api/quiz/:id/submit - Submit quiz attempt
 router.post('/:id/submit', async (req, res) => {
   try {
-    const { answers } = req.body;
+    const { answers, timeSpent } = req.body;
+    
+    // ✅ FIXED: Validate ID
+    if (!req.params.id || req.params.id === 'undefined') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid quiz ID'
+      });
+    }
+
     const quiz = await Quiz.findOne({
       _id: req.params.id,
       user: req.user._id
@@ -308,7 +327,7 @@ router.post('/:id/submit', async (req, res) => {
       totalQuestions: quiz.questions.length,
       passed,
       answers: results,
-      timeSpent: req.body.timeSpent || 0
+      timeSpent: timeSpent || 0
     };
 
     quiz.attempts.push(attempt);
@@ -336,16 +355,24 @@ router.post('/:id/submit', async (req, res) => {
   }
 });
 
-// GET /api/quiz/user/all - Get all user quizzes
-router.get('/user/all', async (req, res) => {
+// GET /api/quiz - Get all user quizzes (FIXED ROUTE)
+router.get('/', async (req, res) => {
   try {
+    const { page = 1, limit = 10 } = req.query;
+    
     const quizzes = await Quiz.find({ user: req.user._id })
       .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
       .populate('documents', 'originalName');
+
+    const count = await Quiz.countDocuments({ user: req.user._id });
 
     res.json({
       success: true,
-      count: quizzes.length,
+      count,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
       data: quizzes
     });
   } catch (error) {

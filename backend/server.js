@@ -8,13 +8,12 @@ import { fileURLToPath } from 'url';
 import connectDB from './src/config/database.js';
 import errorHandler from './src/middleware/errorHandler.js';
 
-// Routes
+// Routes - ALL IMPORTS AT THE TOP
 import authRoutes from './src/routes/auth.js';
 import uploadRoutes from './src/routes/upload.js';
-import summaryRoutes from './src/routes/summary.js';    // Make sure this exists
-import quizRoutes from './src/routes/quiz.js';          // Make sure this exists
+import summaryRoutes from './src/routes/summary.js';
+import quizRoutes from './src/routes/quiz.js';
 import progressRoutes from './src/routes/progress.js';
-
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,7 +27,6 @@ const PORT = process.env.PORT || 5000;
 connectDB();
 
 // Security and middleware
-
 app.use((req, res, next) => {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   next();
@@ -57,8 +55,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
-app.use('/api/summary', summaryRoutes);    // Add this
-app.use('/api/quiz', quizRoutes);          // Add this
+app.use('/api/summary', summaryRoutes);
+app.use('/api/quiz', quizRoutes);
 app.use('/api/progress', progressRoutes);
 
 // Health check
@@ -73,9 +71,12 @@ app.get('/api/health', (req, res) => {
       'POST /api/auth/login', 
       'GET /api/auth/me',
       'POST /api/upload',
-      'GET /api/upload',
+      'GET /api/upload/my-uploads',
+      'GET /api/upload/public/all',
+      'GET /api/upload/public/search',
       'GET /api/upload/:id',
       'DELETE /api/upload/:id',
+      'PATCH /api/upload/:id/visibility',
       'GET /api/summary/:id',
       'GET /api/summary/:id/topics',
       'POST /api/quiz/generate',

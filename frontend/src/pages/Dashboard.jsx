@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { Upload, FileText, Brain, TrendingUp, Plus, ArrowRight } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Upload, FileText, Brain, TrendingUp, Plus, ArrowRight, BarChart3 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import ApiService from '../services/api'
 import Button from '../components/ui/Button'
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [stats, setStats] = useState({
     totalUploads: 0,
     totalWords: 0,
@@ -91,7 +92,7 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid md:grid-cols-2 gap-8 mb-8">
+        <div className="grid md:grid-cols-3 gap-6 mb-8">
           <QuickActionCard
             title="Upload New Document"
             description="Add your study materials and get AI-powered summaries"
@@ -104,9 +105,17 @@ export default function Dashboard() {
             title="View All Documents"
             description="Browse and manage your uploaded study materials"
             icon={<FileText className="h-12 w-12" />}
-            linkTo="/upload"
+            linkTo="/documents"
             buttonText="View Documents"
             color="bg-gradient-to-r from-green-500 to-green-600"
+          />
+          <QuickActionCard
+            title="Quiz History"
+            description="View your past quiz scores and track progress"
+            icon={<BarChart3 className="h-12 w-12" />}
+            linkTo="/quiz-history"
+            buttonText="View History"
+            color="bg-gradient-to-r from-orange-500 to-orange-600"
           />
         </div>
 
@@ -118,7 +127,7 @@ export default function Dashboard() {
                 Recent Documents
               </h2>
               <Link
-                to="/upload"
+                to="/documents"
                 className="text-blue-600 hover:text-blue-500 dark:text-blue-400 text-sm font-medium flex items-center gap-1"
               >
                 View all <ArrowRight className="h-4 w-4" />
@@ -129,7 +138,8 @@ export default function Dashboard() {
               {stats.recentUploads.map((upload) => (
                 <div
                   key={upload._id}
-                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                  onClick={() => navigate(`/summary/${upload._id}`)}
+                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-200 hover:shadow-md"
                 >
                   <div className="flex items-center gap-3">
                     <FileText className="h-6 w-6 text-gray-400" />

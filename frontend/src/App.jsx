@@ -11,6 +11,9 @@ import Upload from "./pages/Upload";
 import Summary from "./pages/Summary";
 import { useState, useEffect } from "react";
 import QuizTake from "./pages/QuizTake";
+import Library from './pages/Library';
+import Documents from './pages/Documents'
+import QuizHistory from './pages/QuizHistory'
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(false);
@@ -79,6 +82,17 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+  path="/quiz-history"
+  element={
+    <ProtectedRoute>
+      <QuizHistory />
+    </ProtectedRoute>
+  }
+/>
+
+            <Route path="/library" element={<Library />} />
+            <Route path="/documents" element={<Documents />} />
           </Routes>
           <Toaster
             position="top-right"

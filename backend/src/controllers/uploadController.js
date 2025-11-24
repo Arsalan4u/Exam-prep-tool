@@ -147,10 +147,11 @@ async function geminiTextProcessing(text) {
   }
 }
 
-// UPLOAD FILE FUNCTION
+// UPLOAD FILE FUNCTION WITH NEW METADATA FIELDS
 export const uploadFile = async (req, res) => {
   try {
     console.log('📤 Upload request received');
+    console.log('📋 Form data:', req.body);
     
     if (!req.file) {
       return res.status(400).json({ 
@@ -159,7 +160,15 @@ export const uploadFile = async (req, res) => {
       });
     }
 
-    const { fileType } = req.body;
+    // Extract metadata from request body
+    const { 
+      fileType, 
+      subject, 
+      semester, 
+      visibility, 
+      description 
+    } = req.body;
+
     let extractedText = '';
     let pageCount = 1;
 
@@ -257,10 +266,13 @@ export const uploadFile = async (req, res) => {
       summaryLength: cleanedSummary.length,
       compressionRatio: processed.compressionRatio + '%',
       keywords: processed.keywords?.length || 0,
-      topics: processed.topics?.length || 0
+      topics: processed.topics?.length || 0,
+      subject: subject || 'General',
+      semester: semester || 'N/A',
+      visibility: visibility || 'private'
     });
 
-    // Save to database
+    // Save to database with NEW metadata fields
     const upload = new Upload({
       user: req.user._id,
       filename: req.file.filename,
@@ -268,6 +280,13 @@ export const uploadFile = async (req, res) => {
       fileType: fileType || 'notes',
       mimeType: req.file.mimetype,
       size: req.file.size,
+      
+      // NEW FIELDS
+      subject: subject || 'General',
+      semester: semester || 'N/A',
+      visibility: visibility || 'private',
+      description: description || '',
+      
       extractedText,
       summary: cleanedSummary,
       keywords: processed.keywords || [],
@@ -287,7 +306,7 @@ export const uploadFile = async (req, res) => {
     });
 
     await upload.save();
-    console.log('🎉 Upload saved successfully!');
+    console.log('🎉 Upload saved successfully with metadata!');
 
     res.status(201).json({
       success: true,
@@ -299,6 +318,9 @@ export const uploadFile = async (req, res) => {
         _id: upload._id,
         originalName: upload.originalName,
         fileType: upload.fileType,
+        subject: upload.subject,
+        semester: upload.semester,
+        visibility: upload.visibility,
         size: upload.size,
         summary: upload.summary,
         keywords: upload.keywords.slice(0, 5),
@@ -320,7 +342,7 @@ export const uploadFile = async (req, res) => {
   }
 };
 
-// GET USER UPLOADS
+// GET USER UPLOADS (all - both private and public)
 export const getUserUploads = async (req, res) => {
   try {
     const uploads = await Upload.find({ user: req.user._id })
@@ -345,18 +367,124 @@ export const getUserUploads = async (req, res) => {
   }
 };
 
-// GET UPLOAD BY ID
+// GET PUBLIC UPLOADS (for library feature)
+export const getPublicUploads = async (req, res) => {
+  try {
+    const { subject, semester, search } = req.query;
+    
+    let query = { visibility: 'public' };
+    
+    // Filter by subject if provided
+    if (subject && subject !== 'all') {
+      query.subject = subject;
+    }
+    
+    // Filter by semester if provided
+    if (semester && semester !== 'all') {
+      query.semester = semester;
+    }
+    
+    // Search in multiple fields
+    if (search) {
+      query.$or = [
+        { originalName: { $regex: search, $options: 'i' } },
+        { subject: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { 'keywords.word': { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    const uploads = await Upload.find(query)
+      .populate('user', 'name email')
+      .select('-extractedText')
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    console.log('📚 Found public uploads:', uploads.length);
+
+    res.json({
+      success: true,
+      count: uploads.length,
+      data: uploads
+    });
+  } catch (error) {
+    console.error('❌ Get public uploads error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch public uploads',
+      error: error.message 
+    });
+  }
+};
+
+// SEARCH UPLOADS (with text search)
+export const searchUploads = async (req, res) => {
+  try {
+    const { query, subject, semester } = req.query;
+    
+    let searchQuery = { visibility: 'public' };
+    
+    // Text search across multiple fields
+    if (query) {
+      searchQuery.$or = [
+        { originalName: { $regex: query, $options: 'i' } },
+        { subject: { $regex: query, $options: 'i' } },
+        { description: { $regex: query, $options: 'i' } },
+        { 'keywords.word': { $regex: query, $options: 'i' } }
+      ];
+    }
+    
+    // Filter by subject
+    if (subject && subject !== 'all') {
+      searchQuery.subject = subject;
+    }
+    
+    // Filter by semester
+    if (semester && semester !== 'all') {
+      searchQuery.semester = semester;
+    }
+    
+    const uploads = await Upload.find(searchQuery)
+      .populate('user', 'name email')
+      .select('-extractedText')
+      .sort({ createdAt: -1 })
+      .limit(50);
+    
+    console.log('🔍 Search results:', uploads.length);
+
+    res.json({
+      success: true,
+      count: uploads.length,
+      data: uploads
+    });
+  } catch (error) {
+    console.error('❌ Search error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Search failed',
+      error: error.message 
+    });
+  }
+};
+
+// GET UPLOAD BY ID (with visibility check)
 export const getUploadById = async (req, res) => {
   try {
-    const upload = await Upload.findOne({ 
-      _id: req.params.id, 
-      user: req.user._id 
-    });
+    const upload = await Upload.findById(req.params.id)
+      .populate('user', 'name email');
 
     if (!upload) {
       return res.status(404).json({ 
         success: false, 
         message: 'Upload not found' 
+      });
+    }
+
+    // Check if user has access (owner or public document)
+    if (upload.visibility === 'private' && upload.user._id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Access denied. This document is private.' 
       });
     }
 
@@ -373,7 +501,7 @@ export const getUploadById = async (req, res) => {
   }
 };
 
-// DELETE UPLOAD
+// DELETE UPLOAD (only by owner)
 export const deleteUpload = async (req, res) => {
   try {
     const upload = await Upload.findOne({ 
@@ -384,7 +512,7 @@ export const deleteUpload = async (req, res) => {
     if (!upload) {
       return res.status(404).json({ 
         success: false, 
-        message: 'Upload not found' 
+        message: 'Upload not found or you do not have permission to delete' 
       });
     }
 
@@ -403,6 +531,45 @@ export const deleteUpload = async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: 'Failed to delete upload',
+      error: error.message 
+    });
+  }
+};
+
+// UPDATE UPLOAD VISIBILITY (toggle private/public)
+export const updateUploadVisibility = async (req, res) => {
+  try {
+    const { visibility } = req.body;
+    
+    if (!['private', 'public'].includes(visibility)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Visibility must be either "private" or "public"' 
+      });
+    }
+
+    const upload = await Upload.findOneAndUpdate(
+      { _id: req.params.id, user: req.user._id },
+      { visibility },
+      { new: true }
+    );
+
+    if (!upload) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Upload not found' 
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Upload visibility updated to ${visibility}`,
+      data: upload
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to update visibility',
       error: error.message 
     });
   }

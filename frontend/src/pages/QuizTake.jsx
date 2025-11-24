@@ -17,32 +17,38 @@ export default function QuizTake() {
   const [showResults, setShowResults] = useState(false);
   const [results, setResults] = useState(null);
   const [flaggedQuestions, setFlaggedQuestions] = useState(new Set());
+  const [quizStarted, setQuizStarted] = useState(false);
 
   useEffect(() => {
     fetchQuiz();
   }, [id]);
 
   useEffect(() => {
-    if (!showResults && quiz) {
+    if (!showResults && quiz && quizStarted) {
       const timer = setInterval(() => {
         setTimeSpent(prev => prev + 1);
       }, 1000);
       return () => clearInterval(timer);
     }
-  }, [showResults, quiz]);
+  }, [showResults, quiz, quizStarted]);
 
   const fetchQuiz = async () => {
     try {
+      console.log('Fetching quiz with ID:', id);
       const response = await ApiService.getQuiz(id);
-      if (response.success) {
+      console.log('Quiz response:', response);
+      
+      if (response.success && response.data) {
         setQuiz(response.data);
+        toast.success('Quiz loaded successfully!');
       } else {
         toast.error('Failed to load quiz');
-        navigate('/upload');
+        navigate('/documents');
       }
     } catch (error) {
       console.error('Failed to fetch quiz:', error);
-      toast.error('Failed to load quiz');
+      toast.error('Failed to load quiz: ' + error.message);
+      navigate('/documents');
     } finally {
       setLoading(false);
     }
@@ -62,9 +68,14 @@ export default function QuizTake() {
     setFlaggedQuestions(newFlagged);
   };
 
+  const startQuiz = () => {
+    setQuizStarted(true);
+    toast.success('Quiz started! Good luck!');
+  };
+
   const handleSubmit = async () => {
     if (Object.keys(answers).length < quiz.questions.length) {
-      if (!confirm('You have unanswered questions. Submit anyway?')) {
+      if (!window.confirm('You have unanswered questions. Submit anyway?')) {
         return;
       }
     }
@@ -93,7 +104,25 @@ export default function QuizTake() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading quiz...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!quiz) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+            Quiz Not Found
+          </h2>
+          <Button onClick={() => navigate('/documents')}>
+            Back to Documents
+          </Button>
+        </div>
       </div>
     );
   }
@@ -105,14 +134,81 @@ export default function QuizTake() {
       setTimeSpent(0);
       setShowResults(false);
       setResults(null);
-    }} />;
+      setQuizStarted(false);
+    }} onBackToDocuments={() => navigate('/documents')} />;
+  }
+
+  // Start Screen
+  if (!quizStarted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center py-8">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-8">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 text-center">
+              {quiz.title}
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mb-8 text-center">
+              {quiz.description}
+            </p>
+
+            <div className="grid md:grid-cols-3 gap-6 mb-8">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-center">
+                <div className="text-2xl font-bold text-blue-600 mb-1">
+                  {quiz.questions?.length || 0}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Questions
+                </div>
+              </div>
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
+                <div className="text-2xl font-bold text-green-600 mb-1">
+                  {quiz.settings?.timeLimit || 20}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Minutes
+                </div>
+              </div>
+              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg text-center">
+                <div className="text-2xl font-bold text-purple-600 mb-1">
+                  Mixed
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Question Types
+                </div>
+              </div>
+            </div>
+
+            <div className="text-left bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mb-8">
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+                Instructions:
+              </h3>
+              <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                <li>• Read each question carefully</li>
+                <li>• You can navigate between questions using the buttons</li>
+                <li>• Your progress is automatically saved</li>
+                <li>• Click Submit Quiz when you're done</li>
+              </ul>
+            </div>
+
+            <Button
+              onClick={startQuiz}
+              size="lg"
+              className="w-full"
+              icon={<Clock className="h-5 w-5" />}
+            >
+              Start Quiz
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const question = quiz.questions[currentQuestion];
   const progress = ((currentQuestion + 1) / quiz.questions.length) * 100;
 
   return (
-    <div className="min-h-screen py-8">
+    <div className="min-h-screen py-8 bg-gray-50 dark:bg-gray-900">
       <div className="max-w-4xl mx-auto px-6">
         {/* Header */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
@@ -177,7 +273,7 @@ export default function QuizTake() {
 
           {/* Answer Options */}
           <div className="space-y-3">
-            {question.type === 'mcq' && question.options.map((option, index) => (
+            {question.type === 'mcq' && question.options?.map((option, index) => (
               <button
                 key={index}
                 onClick={() => handleAnswer(question.id, option.text)}
@@ -245,14 +341,14 @@ export default function QuizTake() {
 
           {/* Question Dots */}
           <div className="flex gap-2">
-            {quiz.questions.map((_, index) => (
+            {quiz.questions.map((q, index) => (
               <button
                 key={index}
                 onClick={() => setCurrentQuestion(index)}
                 className={`w-3 h-3 rounded-full transition-all ${
                   index === currentQuestion
                     ? 'bg-blue-600 w-8'
-                    : answers[quiz.questions[index].id]
+                    : answers[q.id]
                     ? 'bg-green-500'
                     : flaggedQuestions.has(index)
                     ? 'bg-yellow-500'
@@ -285,9 +381,7 @@ export default function QuizTake() {
   );
 }
 
-function QuizResults({ results, quiz, onRetake }) {
-  const navigate = useNavigate();
-
+function QuizResults({ results, quiz, onRetake, onBackToDocuments }) {
   return (
     <div className="min-h-screen py-8">
       <div className="max-w-4xl mx-auto px-6">
@@ -313,10 +407,10 @@ function QuizResults({ results, quiz, onRetake }) {
           </p>
 
           <div className="flex gap-4 justify-center">
-            <Button variant="outline" onClick={() => navigate('/upload')}>
+            <Button variant="outline" onClick={onBackToDocuments}>
               Back to Documents
             </Button>
-            {quiz.settings.allowRetake && (
+            {quiz.settings?.allowRetake && (
               <Button variant="primary" onClick={onRetake}>
                 Retake Quiz
               </Button>
@@ -330,7 +424,7 @@ function QuizResults({ results, quiz, onRetake }) {
             Question Review
           </h3>
 
-          {results.results.map((result, index) => (
+          {results.results?.map((result, index) => (
             <div
               key={index}
               className={`bg-white dark:bg-gray-800 rounded-xl shadow border-2 p-6 ${

@@ -16,7 +16,6 @@ const uploadSchema = new mongoose.Schema({
   },
   fileType: {
     type: String,
-    enum: ['notes', 'pyq', 'syllabus', 'other'],
     required: true
   },
   mimeType: {
@@ -27,29 +26,54 @@ const uploadSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  extractedText: {
+  
+  // NEW METADATA FIELDS
+  subject: {
     type: String,
-    required: true
+    default: 'General'
   },
-  summary: String,
+  semester: {
+    type: String,
+    default: 'N/A'
+  },
+  visibility: {
+    type: String,
+    enum: ['private', 'public'],
+    default: 'private'
+  },
+  description: {
+    type: String,
+    default: ''
+  },
+  
+  extractedText: {
+    type: String
+  },
+  summary: {
+    type: String
+  },
   keywords: [{
     word: String,
-    score: Number
+    score: Number,
+    frequency: Number
   }],
   topics: [{
     name: String,
+    keywords: [String],
     importance: Number,
-    frequency: Number
+    frequency: Number,
+    context: String
   }],
   metadata: {
-    pageCount: Number,
     wordCount: Number,
     readingTime: Number,
-    difficulty: {
-      type: String,
-      enum: ['easy', 'medium', 'hard'],
-      default: 'medium'
-    }
+    pageCount: Number,
+    difficulty: String,
+    avgWordsPerSentence: Number,
+    uniqueWordRatio: Number,
+    sentences: Number,
+    compressionRatio: Number,
+    aiProcessed: Boolean
   },
   processed: {
     type: Boolean,
@@ -59,7 +83,12 @@ const uploadSchema = new mongoose.Schema({
   timestamps: true
 });
 
-uploadSchema.index({ user: 1, createdAt: -1 });
-uploadSchema.index({ fileType: 1 });
+// Create text index for search functionality
+uploadSchema.index({ 
+  subject: 'text', 
+  originalName: 'text',
+  description: 'text',
+  'keywords.word': 'text'
+});
 
 export default mongoose.model('Upload', uploadSchema);

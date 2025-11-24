@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { BookOpen, Sun, Moon, Upload, BarChart3, User, LogOut, Menu, X, Home } from 'lucide-react'
+import { BookOpen, Sun, Moon, Upload, BarChart3, User, LogOut, Menu, X, Home, Library } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 export default function Navbar({ darkMode, toggleDarkMode }) {
@@ -46,6 +46,19 @@ export default function Navbar({ darkMode, toggleDarkMode }) {
             >
               <Home className="h-4 w-4" />
               <span>Home</span>
+            </Link>
+
+            {/* ADDED LIBRARY LINK */}
+            <Link 
+              to="/library" 
+              className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                isActive('/library') 
+                  ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' 
+                  : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+              }`}
+            >
+              <Library className="h-4 w-4" />
+              <span>Library</span>
             </Link>
             
             {isAuthenticated ? (
@@ -128,6 +141,25 @@ export default function Navbar({ darkMode, toggleDarkMode }) {
                       <BarChart3 className="h-4 w-4" />
                       <span>Dashboard</span>
                     </Link>
+                    <Link
+  to="/quiz-history"
+  className="flex items-center space-x-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+  onClick={() => setUserMenuOpen(false)}
+>
+  <BarChart3 className="h-4 w-4" />
+  <span>Quiz History</span>
+</Link>
+
+
+                    {/* ADDED LIBRARY IN USER MENU */}
+                    <Link
+                      to="/library"
+                      className="flex items-center space-x-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      <Library className="h-4 w-4" />
+                      <span>Library</span>
+                    </Link>
                     
                     <Link
                       to="/upload"
@@ -178,6 +210,31 @@ export default function Navbar({ darkMode, toggleDarkMode }) {
                 <Home className="h-4 w-4" />
                 <span>Home</span>
               </Link>
+
+              {/* ADDED LIBRARY IN MOBILE MENU */}
+              <Link 
+                to="/library" 
+                className={`flex items-center space-x-2 px-3 py-2 rounded-md ${
+                  isActive('/library') ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Library className="h-4 w-4" />
+                <span>Library</span>
+              </Link>
+              <Link 
+  to="/quiz-history" 
+  className={`flex items-center space-x-2 px-3 py-2 rounded-md ${
+    isActive('/quiz-history') ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+  }`}
+  onClick={() => setMobileMenuOpen(false)}
+>
+  <BarChart3 className="h-4 w-4" />
+  <span>Quiz History</span>
+</Link>
+
+              
+
               
               {isAuthenticated ? (
                 <>
